@@ -79,13 +79,20 @@ public class JavaDockerDriverTest
     @Test
     public void pullImage() throws IOException, InterruptedException
     {
-        driver.pullImage(listener, "alpine");
+        driver.pullImage(listener, "surenpi/hugo-jnlp-agent");
     }
 
     @Test
     public void checkImageExists() throws IOException, InterruptedException
     {
         Assert.assertTrue(driver.checkImageExists(listener, "mysql:5.6"));
+    }
+
+    @Test
+    public void buildDockerfile() throws IOException, InterruptedException
+    {
+        String dockerfile = "Dockerfile";
+        driver.buildDockerfile(listener, dockerfile, "latest", false);
     }
 
     @Test

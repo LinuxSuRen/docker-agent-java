@@ -1,7 +1,6 @@
 package io.jenkins.plugins.docker.agent;
 
 import com.github.dockerjava.api.model.PullResponseItem;
-import com.github.dockerjava.api.model.ResponseItem;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import hudson.model.TaskListener;
 
@@ -13,12 +12,14 @@ import java.io.Closeable;
 public class JenkinsPullImageResultCallback extends PullImageResultCallback
 {
     private final TaskListener listener;
+    private final JenkinsProgress progress;
     private String image;
 
     public JenkinsPullImageResultCallback(TaskListener listener, String image)
     {
         this.listener = listener;
         this.image = image;
+        progress = new JenkinsProgress(listener);
     }
 
     @Override
@@ -26,19 +27,7 @@ public class JenkinsPullImageResultCallback extends PullImageResultCallback
     {
         super.onNext(item);
 
-        String from = item.getFrom();
-        ResponseItem.ProgressDetail progress = item.getProgressDetail();
-        if(progress == null || progress.getTotal() == null)
-        {
-            listener.getLogger().println(item.getStatus());
-            return;
-        }
-
-        long current = progress.getCurrent();
-        long total = progress.getTotal();
-        long percent = current / total * 100;
-
-        listener.getLogger().println("From: " + from + " percent: " + percent);
+        progress.next(item);
     }
 
     @Override

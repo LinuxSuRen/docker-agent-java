@@ -12,6 +12,7 @@ import com.github.dockerjava.netty.NettyDockerCmdExecFactory;
 import hudson.Launcher;
 import hudson.Proc;
 import hudson.model.TaskListener;
+import io.jenkins.plugins.docker.agent.JenkinsBuildImageResultCallback;
 import io.jenkins.plugins.docker.agent.JenkinsPullImageResultCallback;
 import it.dockins.dockerslaves.Container;
 import it.dockins.dockerslaves.DockerComputer;
@@ -19,8 +20,11 @@ import it.dockins.dockerslaves.spec.Hint;
 import it.dockins.dockerslaves.spi.DockerDriver;
 import it.dockins.dockerslaves.spi.DockerHostConfig;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author suren
@@ -134,7 +138,6 @@ public class JavaDockerDriver extends DockerDriver
         com.github.dockerjava.api.model.Container reContainer = findContainer(remotingContainerId);
 
         CreateContainerResponse containerResponse = dockerClient.createContainerCmd(image)
-//                .withVolumesFrom(reContainer.get)
                 .withLinks(new Link(remotingContainerId, remotingContainerId))
                 .exec();
         dockerClient.startContainerCmd(containerResponse.getId()).exec();
@@ -145,9 +148,11 @@ public class JavaDockerDriver extends DockerDriver
     @Override
     public Proc execInContainer(TaskListener listener, String containerId, Launcher.ProcStarter starter) throws IOException, InterruptedException
     {
-        ExecCreateCmdResponse cmd = dockerClient.execCreateCmd(containerId).withCmd(starter.cmds().toArray(new String[]{})).exec();
+        ExecCreateCmdResponse cmd = dockerClient.execCreateCmd(containerId)
+                .withCmd(starter.cmds().toArray(new String[]{}))
+                .exec();
 
-        return null;
+        return starter.start();
     }
 
     @Override
@@ -161,41 +166,7 @@ public class JavaDockerDriver extends DockerDriver
     public void pullImage(final TaskListener listener, final String image) throws IOException, InterruptedException
     {
         dockerClient.pullImageCmd(image)
-//                .withRepository("http://hub.docker.com")
-//                .withTag("latest")
                 .exec(new JenkinsPullImageResultCallback(listener, image)).awaitSuccess();
-        //8357 3416
-//        dockerClient.pullImageCmd(image).exec(new ResultCallback(){
-//
-//            @Override
-//            public void close() throws IOException
-//            {
-//            }
-//
-//            @Override
-//            public void onStart(Closeable closeable)
-//            {
-//                listener.getLogger().println("start pulling image : " + image);
-//            }
-//
-//            @Override
-//            public void onNext(Object o)
-//            {
-//                listener.getLogger().println(o);
-//            }
-//
-//            @Override
-//            public void onError(Throwable throwable)
-//            {
-//                listener.error(throwable.getMessage());
-//            }
-//
-//            @Override
-//            public void onComplete()
-//            {
-//                listener.getLogger().println("complete pulling image : " + image);
-//            }
-//        });
     }
 
     @Override
@@ -208,7 +179,15 @@ public class JavaDockerDriver extends DockerDriver
     @Override
     public void buildDockerfile(TaskListener listener, String dockerfilePath, String tag, boolean pull) throws IOException, InterruptedException
     {
+        Set<String> tags = new HashSet<>();
+        tags.add(tag);
 
+        String imageId = dockerClient.buildImageCmd(new File(dockerfilePath))
+                .withTags(tags).withPull(pull)
+                .exec(new JenkinsBuildImageResultCallback(listener))
+                .awaitCompletion().awaitImageId();
+
+        listener.getLogger().println("Image id: " + imageId);
     }
 
     @Override
